@@ -250,6 +250,6 @@ public class GUI extends JFrame {
         animating = false;
 
            // TODO: support concurrency better
-//        getTreeLock().notifyAll();
+        notifyAll();
     }
 }

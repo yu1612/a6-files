@@ -29,13 +29,22 @@ public class GUIControl {
     public static void waitForAnimation(Maybe<GUI> guiOpt) {
         // TODO: Avoid inefficient spinning while waiting for GUI
         guiOpt.thenDo(gui -> {
+            synchronized (gui) {
+                try {
+                    while (gui.isAnimating()) {
+                        gui.wait();
+                    }
+                } catch (InterruptedException e) {
+                    throw new RuntimeException();
+                }
+            }
 //            try{
 //                guiOpt.wait();
 //            } catch (InterruptedException e) {
 //                throw new RuntimeException();
 //            }
 
-           while (gui.isAnimating()) {}
+//           while (gui.isAnimating()) {}
         });
     }
 }

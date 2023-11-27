@@ -31,13 +31,7 @@ public class McDiver implements SewerDiver {
         // If you don't succeed, you can always use the first one.
         //
         // Use this same process on the second method, scram.
-
-
-
         look(state);
-//        Stack<Long> visited = new Stack<Long>();
-//        Set<Long> forbidden = new HashSet<>();
-//        dfsWalk(state, visited, forbidden);
     }
 
     public void aStar(SeekState state) {
@@ -80,29 +74,10 @@ public class McDiver implements SewerDiver {
      */
     public void look(SeekState state) {
         assert state != null;
-//
-//        long loc = state.currentLocation();
-//        int dist = state.distanceToRing();
-//
-//        if (dist == 0) {
-//            return;
-//        }
-//
-//        Collection<NodeStatus> neighbors = state.neighbors();
-//        if(neighbors.isEmpty()) {
-//            return;
-//        }
-//        for(NodeStatus neighbor : state.neighbors()) {
-//            state.moveTo(neighbor.getId());
-//            look(state);
-//        }
-
 
         Set<Long> visited = new HashSet<>();
         Stack<Long> previousLocs = new Stack<>();
-        long loc = state.currentLocation();
-        visit(state, visited, loc, previousLocs);
-        return;
+        visit(state, visited, previousLocs);
 
 
 
@@ -112,64 +87,44 @@ public class McDiver implements SewerDiver {
 //        visit(dist, loc, state, visited);
     }
 
-    public void visit(SeekState state, Set<Long> visited, long previousLoc, Stack<Long> previousLocs) {
+    public void visit(SeekState state, Set<Long> visited, Stack<Long> previousLocs) {
 
         long loc = state.currentLocation();
 
         visited.add(loc);
 
+        //this does not feel needed
         //base case: exit out of the method when the diver is already on the ring
-        if(state.distanceToRing() == 0) {
-           return;
+//        if(state.distanceToRing() == 0) {
+//           return;
+//        }
+
+        //make the diver explore the neighbors in smallest cost
+        SlowPQueue frontier = new SlowPQueue();
+        for(NodeStatus neighbor : state.neighbors()) {
+            frontier.add(neighbor, neighbor.getDistanceToRing());
         }
 
-        for(NodeStatus neighbor : state.neighbors()) {
+        while(!frontier.isEmpty()) {
+            //base case: exit out of the method when the diver is already on the ring
             if(state.distanceToRing() == 0) {
                 return;
             }
-            //continuously return diver to the previous location while in a dead end
+            //return diver to the previous location if at a dead end
             if(deadEnd(state.neighbors(),visited)) {
-//                if(previousLoc == neighbor.getId()) {
-//
-//                }
-                System.out.println("dsfdgfjnkldh");
                 state.moveTo(previousLocs.pop());
-                visit(state, visited, previousLoc, previousLocs);
+                visit(state, visited, previousLocs);
             }
+            NodeStatus neighbor = (NodeStatus) frontier.extractMin();
             long neighborId =  neighbor.getId();
-            //if the neighbor has not been visited
+            //recursive case to visit if the neighbor has not been visited
             if(!visited.contains(neighborId)) {
                 state.moveTo(neighborId);
                 previousLocs.push(loc);
-                visit(state,visited,loc,previousLocs);
+                visit(state,visited,previousLocs);
 
             }
         }
-
-
-
-
-
-//        if(dist != 0) {
-//            int shortestDis = Integer.MAX_VALUE;
-//            NodeStatus smallestNeighbor = null;
-//            for(NodeStatus neighbor : state.neighbors()) {
-//                int neighborDis = neighbor.getDistanceToRing();
-//                if(neighborDis <= shortestDis) {
-//                    shortestDis = neighborDis;
-//                    smallestNeighbor = neighbor;
-//                }
-//
-//            }
-//            if(!visited.contains(smallestNeighbor.getId())) {
-//                state.moveTo(smallestNeighbor.getId());
-//                loc = state.currentLocation();
-//                dist = state.distanceToRing();
-//                visited.add(loc);
-//                visit(dist, loc, state, visited);
-//            }
-//
-//        }
     }
 
     /*
@@ -188,56 +143,77 @@ public class McDiver implements SewerDiver {
         return allVisited;
     }
 
-    public void dfsWalk(SeekState state, Stack<Long> visited, Set<Long> forbidden) {
-        //ArrayList<Long> visited = new ArrayList<Long>();
-        boolean noMore = true;
-        long u = state.currentLocation();
-        visited.push(u);
-        int distance = state.distanceToRing();
-        if (distance == 0) {
-            return;
-        }
-        for (NodeStatus neighbor : state.neighbors()) {
-            if (!visited.contains(neighbor.getId()) && !forbidden.contains(neighbor.getId())) {
-                noMore = false;
-                state.moveTo(neighbor.getId());
-                dfsWalk(state, visited, forbidden);
-            }
-        }
-        if (noMore) {
-            state.moveTo(visited.pop());
-            forbidden.add(u);
-            dfsWalk(state, visited, forbidden);
-        }
-
-    }
-
     /** See {@code SewerDriver} for specification. */
     @Override
     public void scram(ScramState state) {
         // TODO: Get out of the sewer system before the steps are used up.
         // DO NOT WRITE ALL THE CODE HERE. Instead, write your method elsewhere,
         // with a good specification, and call it from this one.
-        //bar(state);
-    }
-
-    public void bar(ScramState state) {
-        SlowPQueue frontier = new SlowPQueue();
-        Node bestNeighbor = null;
-        for (Node neighbors : state.currentNode().getNeighbors()) {
-//            if neighbors.
-        }
-        //Collection<Node> allNodes = state.allNodes();
-        Maze maze = new Maze(state.currentNode().getNeighbors());
-
-        ShortestPaths s = new ShortestPaths(maze);
-        while (!state.currentNode().equals(state.exit())) {
-            s.singleSourceDistances(state.currentNode());
-            List<Edge> paths = s.bestPath(state.currentNode());
-            for (Edge e : paths) {
-                state.moveTo(maze.dest(e));
+        Set<Node> coinNodes = new HashSet<>();
+        for (Node n : state.allNodes()) {
+            int coins = n.getTile().coins();
+            if (coins > 0) {
+                coinNodes.add(n);
             }
         }
+        bar(state, coinNodes);
+        //loot(state);
     }
 
+    public void loot(ScramState state) {
+        //set up for finding the shortest path to exit
+        Maze map = new Maze((Set<Node>) state.allNodes());
+        ShortestPaths maze = new ShortestPaths(map);
+        maze.singleSourceDistances(state.currentNode());
+        List<Edge> path = maze.bestPath(state.exit());
+
+        //get a full map of nodes that have coins and their path
+        //not sure what this is for
+        Map coinsNodes = new HashMap();
+        for(Node node: state.allNodes()) {
+            int coins = node.getTile().coins();
+            if(coins != 0) {
+                List<Edge> pathToCoin = maze.bestPath(node);
+                coinsNodes.put(pathToCoin,node);
+            }
+        }
+
+
+
+
+        while(path.size() > state.stepsToGo()) {
+            //coin looting algo
+
+            //update best path after each move
+            maze.singleSourceDistances(state.currentNode());
+            path = maze.bestPath(state.exit());
+        }
+
+        //go back to destination at the end
+        for(Edge e : path) {
+            state.moveTo(e.destination());
+        }
+    }
+
+    public void bar(ScramState state, Set<Node> coinNodes) {
+        Maze maze = new Maze((Set<Node>) state.allNodes());
+        ShortestPaths s = new ShortestPaths(maze);
+        s.singleSourceDistances(state.currentNode());
+        List<Edge> bestPaths = s.bestPath(state.exit());
+
+        for (Edge e : bestPaths) {
+            int closestCoin = Integer.MAX_VALUE;
+            for (Node n : coinNodes) {
+                s.singleSourceDistances(e.source());
+                if (s.bestPath(n).size() < closestCoin) {
+
+                }
+            }
+            Node bestNeighbor = e.destination();
+
+            s.singleSourceDistances(e.source());
+            state.moveTo(bestNeighbor);
+
+        }
+    }
 }
