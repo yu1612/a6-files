@@ -59,12 +59,6 @@ public class McDiver implements SewerDiver {
                 }
             }
         }
-
-
-
-        for(NodeStatus neighbor : state.neighbors()) {
-
-        }
     }
 
 
@@ -77,17 +71,9 @@ public class McDiver implements SewerDiver {
      */
     public void look(SeekState state) {
         assert state != null;
-
         Set<Long> visited = new HashSet<>();
         Stack<Long> previousLocs = new Stack<>();
         visit(state, visited, previousLocs);
-
-
-
-//        Set<Long> visited = new HashSet<Long>();
-//        visited.add(loc);
-//
-//        visit(dist, loc, state, visited);
     }
 
     public void visit(SeekState state, Set<Long> visited, Stack<Long> previousLocs) {
@@ -152,6 +138,8 @@ public class McDiver implements SewerDiver {
         // TODO: Get out of the sewer system before the steps are used up.
         // DO NOT WRITE ALL THE CODE HERE. Instead, write your method elsewhere,
         // with a good specification, and call it from this one.
+
+        // Temporary lists and maps used to store the unsorted nodes containing coins
         List<Node> coinNodes = new ArrayList<>();
         Map<Integer, Node> unsortedCoins = new HashMap<>();
         TreeMap<Integer, Node> coin = new TreeMap<>();
@@ -162,10 +150,9 @@ public class McDiver implements SewerDiver {
                 unsortedCoins.put(coins, n);
             }
         }
+        // Sorts the coins by descending order, where the highest value coin is at the end of the TreeMap, and
+        // can be accessed using peek() and/or pop().
         coin.putAll(unsortedCoins);
-        for (Map.Entry<Integer, Node> entry : coin.entrySet())
-            System.out.println("Key = " + entry.getKey() +
-                    ", Value = " + entry.getValue());
         bar(state, coin);
         //loot(state);
     }
@@ -187,44 +174,74 @@ public class McDiver implements SewerDiver {
                 coinsNodes.put(pathToCoin,node);
             }
         }
-
-
-
-
         while(path.size() > state.stepsToGo()) {
             //coin looting algo
-
             //update best path after each move
             maze.singleSourceDistances(state.currentNode());
             path = maze.bestPath(state.exit());
         }
-
         //go back to destination at the end
         for(Edge e : path) {
             state.moveTo(e.destination());
         }
     }
 
+    /**
+     * Returns the length from state's current node to some `goal` node.
+     */
+    public int lengthToExit(ScramState state, Node goal) {
+        Maze maze = new Maze((Set<Node>) state.allNodes());
+        ShortestPaths s = new ShortestPaths(maze);
+        s.singleSourceDistances(state.currentNode());
+        List<Edge> bestPaths = s.bestPath(goal);
+        int result = 0;
+        // Iterates through the path from state's current node to the `goal` node using the best path
+        // calculated.
+        for (Edge e : bestPaths) {
+            result += e.length();
+        }
+        return result;
+    }
+
+    /**
+     * Moves McDiver out of the sewer system within the prescribed number of steps. Takes a TreeMap
+     * which stores the value and Node of each coin Node on the map, which are represented by an `Integer`
+     * and `Node`, respectively.
+     *
+     * McDiver will path towards the coin with the highest value (as stored in `coinNodes`) while he still has
+     * enough steps to make it to the exit at his current location. If he cannot reach the next coin with
+     * the highest value within the prescribed number of steps, he will take the best path to the exit
+     * from whatever his current location is.
+     */
     public void bar(ScramState state, TreeMap<Integer, Node> coinNodes) {
         Maze maze = new Maze((Set<Node>) state.allNodes());
         ShortestPaths s = new ShortestPaths(maze);
         s.singleSourceDistances(state.currentNode());
-        List<Edge> bestPaths = s.bestPath(state.exit());
+        // The list of Edges that gives the best path to move from McDiver's current location to
+        // the coin with the current highest value.
         List<Edge> coinPath = s.bestPath(coinNodes.get(coinNodes.lastKey()));
+        int coinLen = lengthToExit(state, coinNodes.get(coinNodes.lastKey()));
+        // Removes the coin from `coinNodes`, since it will be picked up.
         coinNodes.remove(coinNodes.lastKey());
-        while (state.stepsToGo() > bestPaths.size() + coinPath.size()) {
+
+        // The length to the exit from McDiver's current location
+        int len = lengthToExit(state, state.exit());
+
+        while (state.stepsToGo() > len + coinLen) {
             for (Edge e : coinPath) {
+                // If McDiver's current location will not allow him to grab the coin and return to the exit
+                // within the remaining step count, he will exit this loop.
+                if (state.stepsToGo() <= len + coinLen) { break; }
                 state.moveTo(e.destination());
-                s.singleSourceDistances(state.currentNode());
-                bestPaths = s.bestPath(state.exit());
-                if (bestPaths.size() + coinPath.size() >= state.stepsToGo()) {
-                    break;
-                }
+                len = lengthToExit(state, state.exit());
             }
             bar(state, coinNodes);
         }
+        // Recalculates the best path from McDiver's current location to the exit
         s.singleSourceDistances(state.currentNode());
-        bestPaths = s.bestPath(state.exit());
+        List<Edge> bestPaths = s.bestPath(state.exit());
+
+        // McDiver goes to the exit
         for (Edge e : bestPaths) {
             state.moveTo(e.destination());
         }
