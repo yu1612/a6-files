@@ -5,12 +5,15 @@ import game.*;
 import graph.ShortestPaths;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.SortedSet;
 import java.util.Stack;
 import java.util.Map;
+import java.util.TreeMap;
 
 
 /** This is the place for your implementation of the {@code SewerDiver}.
@@ -149,14 +152,21 @@ public class McDiver implements SewerDiver {
         // TODO: Get out of the sewer system before the steps are used up.
         // DO NOT WRITE ALL THE CODE HERE. Instead, write your method elsewhere,
         // with a good specification, and call it from this one.
-        Set<Node> coinNodes = new HashSet<>();
+        List<Node> coinNodes = new ArrayList<>();
+        Map<Integer, Node> unsortedCoins = new HashMap<>();
+        TreeMap<Integer, Node> coin = new TreeMap<>();
+
         for (Node n : state.allNodes()) {
             int coins = n.getTile().coins();
             if (coins > 0) {
-                coinNodes.add(n);
+                unsortedCoins.put(coins, n);
             }
         }
-        bar(state, coinNodes);
+        coin.putAll(unsortedCoins);
+        for (Map.Entry<Integer, Node> entry : coin.entrySet())
+            System.out.println("Key = " + entry.getKey() +
+                    ", Value = " + entry.getValue());
+        bar(state, coin);
         //loot(state);
     }
 
@@ -195,25 +205,28 @@ public class McDiver implements SewerDiver {
         }
     }
 
-    public void bar(ScramState state, Set<Node> coinNodes) {
+    public void bar(ScramState state, TreeMap<Integer, Node> coinNodes) {
         Maze maze = new Maze((Set<Node>) state.allNodes());
         ShortestPaths s = new ShortestPaths(maze);
         s.singleSourceDistances(state.currentNode());
         List<Edge> bestPaths = s.bestPath(state.exit());
-
-        for (Edge e : bestPaths) {
-            int closestCoin = Integer.MAX_VALUE;
-            for (Node n : coinNodes) {
-                s.singleSourceDistances(e.source());
-                if (s.bestPath(n).size() < closestCoin) {
-
+        List<Edge> coinPath = s.bestPath(coinNodes.get(coinNodes.lastKey()));
+        coinNodes.remove(coinNodes.lastKey());
+        while (state.stepsToGo() > bestPaths.size() + coinPath.size()) {
+            for (Edge e : coinPath) {
+                state.moveTo(e.destination());
+                s.singleSourceDistances(state.currentNode());
+                bestPaths = s.bestPath(state.exit());
+                if (bestPaths.size() + coinPath.size() >= state.stepsToGo()) {
+                    break;
                 }
             }
-            Node bestNeighbor = e.destination();
-
-            s.singleSourceDistances(e.source());
-            state.moveTo(bestNeighbor);
-
+            bar(state, coinNodes);
+        }
+        s.singleSourceDistances(state.currentNode());
+        bestPaths = s.bestPath(state.exit());
+        for (Edge e : bestPaths) {
+            state.moveTo(e.destination());
         }
     }
 }
